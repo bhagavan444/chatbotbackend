@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from dotenv import load_dotenv
 import google.generativeai as genai
 
 import os
@@ -13,12 +12,11 @@ from docx import Document
 from pptx import Presentation
 import logging
 
-# ---------------- LOAD ENV ----------------
-load_dotenv()
-
+# ---------------- LOAD ENV (RENDER SAFE) ----------------
+# Render automatically provides environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    raise RuntimeError("❌ GEMINI_API_KEY not found in .env file")
+    raise RuntimeError("❌ GEMINI_API_KEY not found in environment variables")
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(level=logging.INFO)
@@ -155,7 +153,7 @@ User input:
 
         return jsonify({"reply": reply, "chat_id": new_chat_id})
 
-    except Exception as e:
+    except Exception:
         logger.exception("Chat error")
         return jsonify({"reply": "Server error"}), 500
 
@@ -171,4 +169,5 @@ def download(filename):
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, threaded=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
