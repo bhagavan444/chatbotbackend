@@ -12,8 +12,7 @@ from docx import Document
 from pptx import Presentation
 import logging
 
-# ---------------- LOAD ENV (RENDER SAFE) ----------------
-# Render automatically provides environment variables
+# ---------------- ENV ----------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("❌ GEMINI_API_KEY not found in environment variables")
@@ -25,15 +24,23 @@ logger = logging.getLogger(__name__)
 # ---------------- GEMINI CONFIG ----------------
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 🔥 AUTO-DETECT SUPPORTED MODEL
-def get_working_model():
-    for m in genai.list_models():
-        if "generateContent" in m.supported_generation_methods:
-            logger.info(f"✅ Using Gemini model: {m.name}")
-            return genai.GenerativeModel(m.name)
-    raise RuntimeError("❌ No supported Gemini model found for this API key")
+# ---------------- LAZY MODEL LOADER (DEPLOY SAFE) ----------------
+_model = None
+_model_lock = Lock()
 
-model = get_working_model()
+def get_working_model():
+    global _model
+    with _model_lock:
+        if _model is not None:
+            return _model
+
+        for m in genai.list_models():
+            if "generateContent" in m.supported_generation_methods:
+                logger.info(f"✅ Using Gemini model: {m.name}")
+                _model = genai.GenerativeModel(m.name)
+                return _model
+
+        raise RuntimeError("❌ No supported Gemini model found")
 
 # ---------------- APP SETUP ----------------
 app = Flask(__name__)
@@ -75,6 +82,7 @@ def extract_file_text(path):
 # ---------------- GEMINI CALL ----------------
 def call_gemini(prompt):
     try:
+        model = get_working_model()
         response = model.generate_content(prompt)
 
         if response and response.candidates:
